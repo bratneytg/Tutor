@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0f1115" />
+  <title>AWS Tutor · explícamelo fácil</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23ff9900'/%3E%3Cpath d='M18 40c4 6 24 6 28 0' stroke='%230f1115' stroke-width='5' fill='none' stroke-linecap='round'/%3E%3Cpath d='M22 24l-6 8 6 8M42 24l6 8-6 8' stroke='%230f1115' stroke-width='5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="cabecera">
+    <div class="marca">
+      <span class="logo" aria-hidden="true">☁</span>
+      <div>
+        <h1>AWS Tutor</h1>
+        <p>Pega lo que no te quedó claro. Te lo explico fácil, con ejemplos, y te lo leo en voz alta.</p>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <main>
+      <section class="tarjeta" aria-labelledby="t-entrada">
+        <h2 id="t-entrada" class="oculto">Qué quieres entender</h2>
+
+        <div id="codigoBox" class="codigo" hidden>
+          <label for="codigo">Código de acceso</label>
+          <div class="fila">
+            <input id="codigo" type="password" autocomplete="off" placeholder="Pídeselo al dueño de la app" />
+            <button id="guardarCodigo" class="secundario" type="button">Guardar</button>
+          </div>
+        </div>
+
+        <label for="texto">Tema, pregunta o párrafo</label>
+        <textarea id="texto" rows="6" maxlength="4000" placeholder="Ej.: ¿Qué diferencia hay entre un Security Group y una Network ACL?&#10;o pega aquí el párrafo del curso que no entendiste…"></textarea>
+        <div class="pie-texto"><span id="contador">0 / 4000</span><span class="atajo">Ctrl + Enter para explicar</span></div>
+
+        <fieldset>
+          <legend>Nivel</legend>
+          <div class="segmentos" id="nivel">
+            <label><input type="radio" name="nivel" value="nino" /><span>Como si tuviera 12 años</span></label>
+            <label><input type="radio" name="nivel" value="basico" checked /><span>Principiante</span></label>
+            <label><input type="radio" name="nivel" value="intermedio" /><span>Intermedio</span></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Incluir</legend>
+          <div class="chips" id="estilos">
+            <label><input type="checkbox" value="facil" checked /><span>Palabras sencillas</span></label>
+            <label><input type="checkbox" value="ejemplos" checked /><span>Ejemplos</span></label>
+            <label><input type="checkbox" value="analogia" /><span>Analogía cotidiana</span></label>
+            <label><input type="checkbox" value="pasos" /><span>Paso a paso</span></label>
+            <label><input type="checkbox" value="caso" /><span>Caso real en AWS</span></label>
+            <label><input type="checkbox" value="claves" /><span>Puntos clave</span></label>
+            <label><input type="checkbox" value="examen" /><span>Tip de examen</span></label>
+          </div>
+        </fieldset>
+
+        <div class="acciones">
+          <label class="idioma">Idioma
+            <select id="idioma"><option value="es">Español</option><option value="en">English</option></select>
+          </label>
+          <label class="auto"><input type="checkbox" id="auto" /> Leer en voz alta al terminar</label>
+          <button id="explicar" class="primario" type="button">Explicar</button>
+        </div>
+      </section>
+
+      <section id="salida" class="tarjeta" hidden aria-labelledby="t-salida">
+        <h2 id="t-salida" class="oculto">Explicación</h2>
+
+        <div class="reproductor" role="group" aria-label="Escuchar la explicación">
+          <button id="play" class="primario redondo" type="button" aria-label="Escuchar">▶</button>
+          <button id="stop" class="secundario redondo" type="button" aria-label="Detener" disabled>■</button>
+          <label class="campo">Voz
+            <select id="voz"></select>
+          </label>
+          <label class="campo velocidad"><span>Velocidad <output id="velTexto">1.0×</output></span>
+            <input id="velocidad" type="range" min="0.6" max="1.6" step="0.1" value="1" />
+          </label>
+          <span id="estadoVoz" class="estado-voz" aria-live="polite"></span>
+        </div>
+
+        <article id="resultado" class="resultado" aria-live="polite"></article>
+
+        <div class="ajustes">
+          <span>¿Sigue sin quedar claro?</span>
+          <button type="button" class="secundario" data-ajuste="mas_simple">Más simple</button>
+          <button type="button" class="secundario" data-ajuste="mas_ejemplos">Más ejemplos</button>
+          <button type="button" class="secundario" data-ajuste="mas_tecnico">Más técnico</button>
+          <button type="button" class="secundario" data-ajuste="mas_corto">Más corto</button>
+          <button type="button" class="fantasma" id="copiar">Copiar</button>
+        </div>
+      </section>
+
+      <p id="error" class="error" role="alert" hidden></p>
+    </main>
+
+    <aside class="tarjeta historial" aria-labelledby="t-hist">
+      <div class="cab-hist">
+        <h2 id="t-hist">Historial</h2>
+        <button id="borrarHist" class="fantasma" type="button" hidden>Borrar todo</button>
+      </div>
+      <ul id="listaHist"></ul>
+      <p id="vacioHist" class="vacio">Aquí quedan tus consultas para repasarlas después.</p>
+    </aside>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

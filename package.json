@@ -1,0 +1,13 @@
+{
+  "name": "aws-tutor",
+  "version": "1.0.0",
+  "description": "Pega un tema o párrafo de tu curso de AWS y recibe una explicación simple, con ejemplos, en texto y en voz",
+  "private": true,
+  "type": "module",
+  "main": "server.js",
+  "engines": { "node": ">=20.12" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  }
+}
