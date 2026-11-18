@@ -1,8 +1,10 @@
-import { renderMarkdown, textoParaVoz, trocear } from './md.js';
+import { renderMarkdown, textoParaVoz, textoLiteralParaVoz, trocear } from './md.js';
 
 const $ = (id) => document.getElementById(id);
 const LS = { hist: 'awstutor.hist', codigo: 'awstutor.codigo', voz: 'awstutor.voz', vel: 'awstutor.vel', pref: 'awstutor.pref' };
 const MAX_HIST = 30;
+const MAX_LEER = 30000;       // caracteres máximos en modo "solo leer"
+const MAX_PARTE_NATURAL = 4500; // ElevenLabs acepta 5000 por petición: los textos largos se leen por partes
 
 const almacen = {
   get(k, def) { try { const v = localStorage.getItem(k); return v === null ? def : JSON.parse(v); } catch { return def; } },
@@ -44,6 +46,7 @@ async function llamar(ruta, cuerpo, signal) {
 let generacion = 0;         // invalida callbacks viejos cuando se pulsa stop o se pide otra cosa
 let estadoVoz = 'idle';     // idle | cargando | sonando | pausa
 let audio = null;
+let liberarAudio = null;   // desbloquea la espera del audio actual al detener
 const cacheAudio = new Map();
 
 function setEstado(estado, nota = '') {
@@ -93,7 +96,7 @@ async function urlAudioNatural(texto, voz) {
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'No se pudo generar la voz');
   const url = URL.createObjectURL(await r.blob());
   cacheAudio.set(clave, url);
-  if (cacheAudio.size > 4) { const [vieja] = cacheAudio.keys(); URL.revokeObjectURL(cacheAudio.get(vieja)); cacheAudio.delete(vieja); }
+  if (cacheAudio.size > 6) { const [vieja] = cacheAudio.keys(); URL.revokeObjectURL(cacheAudio.get(vieja)); cacheAudio.delete(vieja); }
   return url;
 }
 
@@ -105,19 +108,28 @@ async function reproducir() {
   const gen = ++generacion;
   const valor = $('voz').value;
   const [motor, id] = [valor.slice(0, 2), valor.slice(3)];
-  const texto = textoParaVoz(actual.explicacion, actual.idioma);
+  const texto = actual.literal ? textoLiteralParaVoz(actual.texto, actual.idioma) : textoParaVoz(actual.explicacion, actual.idioma);
   mostrarError('');
 
   if (motor === 'el') {
+    const partes = trocear(texto, MAX_PARTE_NATURAL);
     setEstado('cargando');
     try {
-      const url = await urlAudioNatural(texto, id);
-      if (gen !== generacion) return;
-      audio = new Audio(url);
-      audio.playbackRate = velocidad();
-      audio.onended = () => { if (gen === generacion) setEstado('idle'); };
-      await audio.play();
-      setEstado('sonando');
+      let siguiente = urlAudioNatural(partes[0], id);
+      siguiente.catch(() => {});                 // evita aviso de promesa sin capturar si se detiene a mitad
+      for (let i = 0; i < partes.length; i++) {
+        const url = await siguiente;
+        if (gen !== generacion) return;
+        if (i + 1 < partes.length) { siguiente = urlAudioNatural(partes[i + 1], id); siguiente.catch(() => {}); } // prepara la siguiente mientras suena esta
+        audio = new Audio(url);
+        audio.playbackRate = velocidad();
+        const fin = new Promise((res) => { liberarAudio = res; audio.onended = res; audio.onerror = res; });
+        await audio.play();
+        setEstado('sonando', partes.length > 1 ? `Leyendo parte ${i + 1} de ${partes.length}…` : '');
+        await fin;
+        if (gen !== generacion) return;
+      }
+      setEstado('idle');
     } catch (e) {
       if (gen !== generacion) return;
       setEstado('idle');
@@ -161,6 +173,7 @@ function pausarOContinuar() {
 function detener() {
   generacion++;
   if (audio) { audio.pause(); audio = null; }
+  liberarAudio?.(); liberarAudio = null;
   if (soportaNavegador) { speechSynthesis.cancel(); speechSynthesis.resume(); }
   setEstado('idle');
 }
@@ -216,7 +229,14 @@ function abrirDelHist(id) {
 // ---------------------------------------------------------------------------
 function mostrarResultado(entrada) {
   actual = entrada;
-  $('resultado').innerHTML = renderMarkdown(entrada.explicacion); // renderMarkdown escapa todo el texto antes de añadir etiquetas
+  const cont = $('resultado');
+  cont.classList.toggle('literal', !!entrada.literal);
+  if (entrada.literal) {
+    // texto pegado: se muestra tal cual, párrafo a párrafo y sin interpretar nada
+    cont.replaceChildren(...entrada.texto.split(/\n\s*\n/).filter(p => p.trim()).map(p => Object.assign(document.createElement('p'), { textContent: p.trim() })));
+  } else {
+    cont.innerHTML = renderMarkdown(entrada.explicacion); // renderMarkdown escapa todo el texto antes de añadir etiquetas
+  }
   $('salida').hidden = false;
   mostrarError('');
 }
@@ -226,7 +246,7 @@ async function pedir(ajuste = null) {
     texto: $('texto').value.trim(), nivel: nivelMarcado(), estilos: estilosMarcados(), idioma: idiomaActual(),
   };
   if (base.texto.length < 2) { mostrarError('Escribe un tema o pega un párrafo'); $('texto').focus(); return; }
-  if (!ajuste) almacen.set(LS.pref, { nivel: base.nivel, estilos: base.estilos, idioma: base.idioma, auto: $('auto').checked });
+  if (!ajuste) almacen.set(LS.pref, { modo: 'explicar', nivel: base.nivel, estilos: base.estilos, idioma: base.idioma, auto: $('auto').checked });
 
   peticion?.abort();
   peticion = new AbortController();
@@ -265,13 +285,42 @@ async function pedir(ajuste = null) {
 // ---------------------------------------------------------------------------
 // Arranque
 // ---------------------------------------------------------------------------
+const modo = () => document.querySelector('#modo input:checked')?.value ?? 'explicar';
+const limiteTexto = () => (modo() === 'leer' ? MAX_LEER : config.maxTexto);
+
 function actualizarContador() {
-  $('contador').textContent = `${$('texto').value.length} / ${config.maxTexto}`;
+  $('contador').textContent = `${$('texto').value.length} / ${limiteTexto()}`;
 }
+
+function aplicarModo({ limpiar = false } = {}) {
+  const leer = modo() === 'leer';
+  document.body.classList.toggle('modo-leer', leer);
+  $('explicar').textContent = leer ? 'Leer en voz alta' : 'Explicar';
+  document.querySelector('.atajo').textContent = leer ? 'Ctrl + Enter para leer' : 'Ctrl + Enter para explicar';
+  $('etiquetaTexto').textContent = leer ? 'Texto que quieres escuchar' : 'Tema, pregunta o párrafo';
+  $('texto').placeholder = leer ? 'Pega aquí el texto que quieres que te lea en voz alta…' : $('texto').dataset.placeholderIa;
+  $('texto').maxLength = limiteTexto();
+  actualizarContador();
+  if (limpiar) { detener(); $('salida').hidden = true; actual = null; mostrarError(''); }
+}
+
+function leerTexto() {
+  const texto = $('texto').value.trim();
+  if (texto.length < 2) { mostrarError('Pega o escribe el texto que quieres escuchar'); $('texto').focus(); return; }
+  peticion?.abort();
+  almacen.set(LS.pref, { ...almacen.get(LS.pref, {}), modo: 'leer', idioma: idiomaActual() });
+  detener();
+  mostrarResultado({ id: 'leer', ts: Date.now(), texto, nivel: 'basico', estilos: [], idioma: idiomaActual(), explicacion: texto, literal: true });
+  $('salida').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  reproducir();
+}
+
+async function accion() { return modo() === 'leer' ? leerTexto() : pedir(); }
 
 function restaurarPreferencias() {
   const p = almacen.get(LS.pref, null);
   if (p) {
+    if (p.modo === 'leer') document.querySelector('#modo input[value="leer"]').checked = true;
     document.querySelector(`#nivel input[value="${p.nivel}"]`)?.click();
     document.querySelectorAll('#estilos input').forEach(i => { i.checked = p.estilos?.includes(i.value) ?? i.checked; });
     if (p.idioma === 'en' || p.idioma === 'es') $('idioma').value = p.idioma;
@@ -284,9 +333,9 @@ function restaurarPreferencias() {
 async function iniciar() {
   try { config = { ...config, ...(await (await fetch('/api/config')).json()) }; } catch { /* sin config: se usan los valores por defecto */ }
   $('codigoBox').hidden = !config.requiereCodigo || !!almacen.get(LS.codigo, '');
-  $('texto').maxLength = config.maxTexto;
+  $('texto').dataset.placeholderIa = $('texto').placeholder;
   restaurarPreferencias();
-  actualizarContador();
+  aplicarModo();
   poblarVoces();
   setEstado('idle');
   pintarHist();
@@ -295,8 +344,26 @@ async function iniciar() {
 }
 
 $('texto').addEventListener('input', actualizarContador);
-$('texto').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); pedir(); } });
-$('explicar').addEventListener('click', () => pedir());
+$('texto').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); accion(); } });
+$('explicar').addEventListener('click', accion);
+document.querySelectorAll('#modo input').forEach(i => i.addEventListener('change', () => aplicarModo({ limpiar: true })));
+$('aExplicar').addEventListener('click', () => {
+  document.querySelector('#modo input[value="explicar"]').checked = true;
+  aplicarModo({ limpiar: true });
+  pedir();
+});
+$('pegar').addEventListener('click', async () => {
+  try {
+    const t = await navigator.clipboard.readText();
+    if (!t.trim()) return mostrarError('El portapapeles está vacío');
+    $('texto').value = t.slice(0, limiteTexto());
+    actualizarContador();
+    mostrarError(t.length > limiteTexto() ? `El texto era más largo: se ha recortado a ${limiteTexto()} caracteres` : '');
+    $('texto').focus();
+  } catch {
+    mostrarError('Tu navegador no permite leer el portapapeles desde aquí: pega con Ctrl+V (⌘+V en Mac)');
+  }
+});
 document.querySelectorAll('[data-ajuste]').forEach(b => b.addEventListener('click', () => pedir(b.dataset.ajuste)));
 $('idioma').addEventListener('change', poblarVoces);
 $('voz').addEventListener('change', () => { almacen.set(`${LS.voz}.${idiomaActual()}`, $('voz').value); if (estadoVoz !== 'idle') detener(); });

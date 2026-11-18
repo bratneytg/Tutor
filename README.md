@@ -7,6 +7,7 @@ Pega un tema o un párrafo de tu curso de AWS que no te quedó claro y recibe un
 - **¿Sigue sin quedar claro?** Botones para reexplicar: más simple, más ejemplos, más técnico, más corto.
 - **Voz**: voces del navegador (gratis) o voz natural de ElevenLabs si configuras la clave. Pausa, stop y velocidad. Las siglas (EC2, S3, IAM…) se deletrean para que se oigan bien.
 - **Historial** de consultas guardado en tu navegador, para repasar.
+- **Modo "Solo leer en voz alta"**: pega cualquier texto (con el botón "Pegar del portapapeles" o con Ctrl+V) y te lo lee tal cual, sin pasar por la IA, así que no gasta Gemini. Admite hasta 30 000 caracteres; con la voz natural se lee por partes. Desde ahí también puedes pulsar "Explicar este texto con IA".
 - Español o inglés.
 
 ## Proyecto independiente

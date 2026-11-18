@@ -33,11 +33,19 @@
           </div>
         </div>
 
-        <label for="texto">Tema, pregunta o párrafo</label>
+        <div class="segmentos modos" id="modo" role="radiogroup" aria-label="Qué quieres hacer">
+          <label><input type="radio" name="modo" value="explicar" checked /><span>Explicar con IA</span></label>
+          <label><input type="radio" name="modo" value="leer" /><span>Solo leer en voz alta</span></label>
+        </div>
+
+        <div class="cab-texto">
+          <label for="texto" id="etiquetaTexto">Tema, pregunta o párrafo</label>
+          <button id="pegar" class="fantasma" type="button">Pegar del portapapeles</button>
+        </div>
         <textarea id="texto" rows="6" maxlength="4000" placeholder="Ej.: ¿Qué diferencia hay entre un Security Group y una Network ACL?&#10;o pega aquí el párrafo del curso que no entendiste…"></textarea>
         <div class="pie-texto"><span id="contador">0 / 4000</span><span class="atajo">Ctrl + Enter para explicar</span></div>
 
-        <fieldset>
+        <fieldset class="solo-ia">
           <legend>Nivel</legend>
           <div class="segmentos" id="nivel">
             <label><input type="radio" name="nivel" value="nino" /><span>Como si tuviera 12 años</span></label>
@@ -46,7 +54,7 @@
           </div>
         </fieldset>
 
-        <fieldset>
+        <fieldset class="solo-ia">
           <legend>Incluir</legend>
           <div class="chips" id="estilos">
             <label><input type="checkbox" value="facil" checked /><span>Palabras sencillas</span></label>
@@ -63,7 +71,7 @@
           <label class="idioma">Idioma
             <select id="idioma"><option value="es">Español</option><option value="en">English</option></select>
           </label>
-          <label class="auto"><input type="checkbox" id="auto" /> Leer en voz alta al terminar</label>
+          <label class="auto solo-ia"><input type="checkbox" id="auto" /> Leer en voz alta al terminar</label>
           <button id="explicar" class="primario" type="button">Explicar</button>
         </div>
       </section>
@@ -85,13 +93,17 @@
 
         <article id="resultado" class="resultado" aria-live="polite"></article>
 
-        <div class="ajustes">
+        <div class="ajustes solo-ia">
           <span>¿Sigue sin quedar claro?</span>
           <button type="button" class="secundario" data-ajuste="mas_simple">Más simple</button>
           <button type="button" class="secundario" data-ajuste="mas_ejemplos">Más ejemplos</button>
           <button type="button" class="secundario" data-ajuste="mas_tecnico">Más técnico</button>
           <button type="button" class="secundario" data-ajuste="mas_corto">Más corto</button>
           <button type="button" class="fantasma" id="copiar">Copiar</button>
+        </div>
+        <div class="ajustes solo-leer">
+          <span>¿Prefieres entenderlo mejor?</span>
+          <button type="button" class="secundario" id="aExplicar">Explicar este texto con IA</button>
         </div>
       </section>
 

@@ -79,6 +79,20 @@ export function textoParaVoz(md, idioma = 'es') {
     .trim();
 }
 
+/** Texto pegado por el usuario → texto para leer tal cual (sin interpretar Markdown). */
+export function textoLiteralParaVoz(texto, idioma = 'es') {
+  const enlace = idioma === 'en' ? 'link' : 'enlace';
+  return String(texto)
+    .replace(/\r\n?/g, '\n')
+    .replace(/https?:\/\/\S+/g, ` ${enlace} `)
+    .replace(RE_SIGLAS, (s) => s.split('').join(' '))
+    .split(/\n\s*\n/)                                   // párrafos
+    .map(p => p.replace(/\s*\n\s*/g, ' ').replace(/[ \t]+/g, ' ').trim()) // saltos de línea sueltos (típicos al copiar de un PDF) → espacio
+    .filter(Boolean)
+    .map(p => (/[.!?…:;]$/.test(p) ? p : `${p}.`))        // cada párrafo o título termina en pausa
+    .join('\n');
+}
+
 /** Trocea el texto por frases (≤ max caracteres): las voces del navegador se cortan con textos largos. */
 export function trocear(texto, max = 220) {
   const frases = texto.replace(/\n/g, ' ').match(/[^.!?;:]+[.!?;:]*\s*/g) ?? [texto];
